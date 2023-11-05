@@ -61,7 +61,7 @@ def quaternion_to_euler(quaternions):
 
 if __name__ == "__main__":
     
-    import pytorch_utils as ptu
+    import utils.pytorch as ptu
 
     # Example usage:
     # Define a batch of Euler angles (roll, pitch, yaw) in radians
@@ -72,13 +72,13 @@ if __name__ == "__main__":
     ]) * torch.pi/180  # Convert degrees to radians
 
     # Convert to quaternions
-    quaternions_batch = euler_to_quaternion_batch_torch(euler_angles_batch)
+    quaternions_batch = euler_to_quaternion(euler_angles_batch)
 
     # Print the quaternions
     print("Quaternions:\n", quaternions_batch)
 
     # Convert to Euler angles
-    eul_batch = quaternion_to_euler_batch_torch(quaternions_batch)
+    eul_batch = quaternion_to_euler(quaternions_batch)
 
     # Print the Euler angles in radians
     print(f"eul_batch: {eul_batch * 180/torch.pi}")
