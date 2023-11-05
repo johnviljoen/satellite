@@ -59,6 +59,23 @@ def quaternion_to_euler(quaternions):
 
     return torch.vstack([roll, pitch, yaw]).T
 
+# Function to calculate the quaternion derivative given quaternion and angular velocity
+def quaternion_derivative(q, omega):
+    # Assuming q is of shape [batch, 4] with q = [q0, q1, q2, q3]
+    # omega is of shape [batch, 3] with omega = [p, q, r]
+    
+    # Quaternion multiplication matrix
+    Q_mat = torch.cat([
+        -q[:, 1:2], -q[:, 2:3], -q[:, 3:4],
+         q[:, 0:1], -q[:, 3:4],  q[:, 2:3],
+         q[:, 3:4],  q[:, 0:1], -q[:, 1:2],
+        -q[:, 2:3],  q[:, 1:2],  q[:, 0:1]
+    ], dim=1).view(-1, 4, 3)
+
+    # Multiply by the angular velocity
+    q_dot = 0.5 * torch.bmm(Q_mat, omega.unsqueeze(-1)).squeeze(-1)
+    return q_dot
+
 if __name__ == "__main__":
     
     import utils.pytorch as ptu
