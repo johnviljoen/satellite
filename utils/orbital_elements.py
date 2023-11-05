@@ -1,7 +1,11 @@
 import torch
+import utils.pytorch as ptu
 
-def state_to_orbital_elements(r_vec, v_vec, mu=398600.4418):
+def state_to_orbital_elements(state, mu=398600.4418):
     
+    r_vec = state[:,:3]
+    v_vec = state[:,7:10]
+
     # Calculate specific angular momentum
     h_vec = torch.cross(r_vec, v_vec, dim=1)
     h = torch.norm(h_vec, dim=1)

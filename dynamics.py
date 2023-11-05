@@ -28,7 +28,7 @@ def state_dot(state: torch.Tensor, action: torch.Tensor, G=6.67430e-11, M=5.972e
     r_squared = torch.sum(pos * pos, dim=1, keepdim=True)  # [minibatch, 1]
 
     # Compute the gravitational acceleration
-    r = torch.sqrt(r_squared)  # [minibatch, 1]
+    r = torch.sqrt(r_squared)                   # [minibatch, 1]
     acc_gravity = -G * M / r_squared * pos / r  # [minibatch, 3]
 
     # Quaternion derivatives need to be calculated with respect to angular rates
@@ -47,23 +47,6 @@ def state_dot(state: torch.Tensor, action: torch.Tensor, G=6.67430e-11, M=5.972e
     ])
 
     return state_dot
-    
-# return torch.hstack([
-#     state[:,7:8],
-#     state[:,8:9],
-#     state[:,9:10],
-#     -0.5 * state[:,10:11] * state[:,4:5] - 0.5 * state[:,11:12] * state[:,5:6] - 0.5 * state[:,6:7] * state[:,12:13],
-#     0.5 *  state[:,10:11] * state[:,3:4] - 0.5 * state[:,11:12] * state[:,6:7] + 0.5 * state[:,5:6] * state[:,12:13],
-#     0.5 *  state[:,10:11] * state[:,6:7] + 0.5 * state[:,11:12] * state[:,3:4] - 0.5 * state[:,4:5] * state[:,12:13],
-#     -0.5 * state[:,10:11] * state[:,5:6] + 0.5 * state[:,11:12] * state[:,4:5] + 0.5 * state[:,3:4] * state[:,12:13],
-#     action[:,0:1],
-#     action[:,1:2],
-#     action[:,2:3],
-#     action[:,3:4],
-#     action[:,4:5],
-#     action[:,5:6],
-# ])
-
 
 if __name__ == "__main__":
 
