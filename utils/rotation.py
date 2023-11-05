@@ -1,6 +1,6 @@
 import torch
 
-def euler_to_quaternion(euler_angles):
+def euler_to_quaternion(euler_angles: torch.Tensor):
     # euler_angles is a tensor of shape (batch_size, 3)
     # where each row is (roll, pitch, yaw)
     rolls = euler_angles[:, 0]
@@ -26,7 +26,7 @@ def euler_to_quaternion(euler_angles):
     
     return quaternions_normalized
 
-def quaternion_to_euler(quaternions):
+def quaternion_to_euler(quaternions: torch.Tensor):
     # quaternions is a tensor of shape (batch_size, 4)
     # where each row is [q0, q1, q2, q3] with q0 being the scalar part
 
@@ -59,8 +59,45 @@ def quaternion_to_euler(quaternions):
 
     return torch.vstack([roll, pitch, yaw]).T
 
+def euler_to_rot_matrix(roll, pitch, yaw):
+    # Assumes the angles are in radians and the order is 'XYZ'
+    cos = torch.cos
+    sin = torch.sin
+
+    # Pre-calculate cosines and sines
+    cos_roll = cos(roll)
+    sin_roll = sin(roll)
+    cos_pitch = cos(pitch)
+    sin_pitch = sin(pitch)
+    cos_yaw = cos(yaw)
+    sin_yaw = sin(yaw)
+
+    # Calculate rotation matrix components
+    R_x = torch.stack([
+        torch.ones_like(roll), torch.zeros_like(roll), torch.zeros_like(roll),
+        torch.zeros_like(roll), cos_roll, -sin_roll,
+        torch.zeros_like(roll), sin_roll, cos_roll
+    ], dim=1).reshape(-1, 3, 3)
+
+    R_y = torch.stack([
+        cos_pitch, torch.zeros_like(pitch), sin_pitch,
+        torch.zeros_like(pitch), torch.ones_like(pitch), torch.zeros_like(pitch),
+        -sin_pitch, torch.zeros_like(pitch), cos_pitch
+    ], dim=1).reshape(-1, 3, 3)
+
+    R_z = torch.stack([
+        cos_yaw, -sin_yaw, torch.zeros_like(yaw),
+        sin_yaw, cos_yaw, torch.zeros_like(yaw),
+        torch.zeros_like(yaw), torch.zeros_like(yaw), torch.ones_like(yaw)
+    ], dim=1).reshape(-1, 3, 3)
+
+    # The final rotation matrix combines rotations around all axes
+    R = torch.bmm(torch.bmm(R_z, R_y), R_x)
+
+    return R
+
 # Function to calculate the quaternion derivative given quaternion and angular velocity
-def quaternion_derivative(q, omega):
+def quaternion_derivative(q: torch.Tensor, omega: torch.Tensor):
     # Assuming q is of shape [batch, 4] with q = [q0, q1, q2, q3]
     # omega is of shape [batch, 3] with omega = [p, q, r]
     

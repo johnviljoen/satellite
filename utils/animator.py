@@ -3,6 +3,8 @@ from matplotlib import animation
 import numpy as np
 from datetime import datetime
 import os
+from utils.rotation import quaternion_to_euler, euler_to_rot_matrix
+import utils.pytorch as ptu
 
 class Animator:
     def __init__(
@@ -46,7 +48,10 @@ class Animator:
         self.ax.plot(self.xDes, self.yDes, self.zDes, ':', lw=1.3, color='green')
 
         self.sphere = None # the sphere is only drawn later
-        self.line1, = self.ax.plot([], [], [], lw=2, color='red') # the line that will be the orbit
+        self.line1, = self.ax.plot([], [], [], lw=2, color='black') # the line that will be the orbit
+        self.line2, = self.ax.plot([], [], [], lw=2, color='blue') # the line that will be the orbit
+        self.line3, = self.ax.plot([], [], [], lw=2, color='green') # the line that will be the orbit
+        self.line4, = self.ax.plot([], [], [], lw=2, color='red') # the line that will be the orbit
         
         # Setting the axes properties
         extraEachSide = 0.5
@@ -65,10 +70,12 @@ class Animator:
         mid_x = 0.5*(x_max+x_min)
         mid_y = 0.5*(y_max+y_min)
         mid_z = 0.5*(z_max+z_min)
+
+        self.length = maxRange * 0.1
         
         self.ax.set_xlim3d([mid_x-maxRange, mid_x+maxRange])
         self.ax.set_xlabel('X')
-        self.ax.set_ylim3d([mid_y-maxRange, mid_y+maxRange]) # NED
+        self.ax.set_ylim3d([mid_y-maxRange, mid_y+maxRange]) # NED inv
         self.ax.set_ylabel('Y')
         self.ax.set_zlim3d([mid_z-maxRange, mid_z+maxRange])
         self.ax.set_zlabel('Z')
@@ -107,6 +114,8 @@ class Animator:
             self.q3
         ])[:,i]
 
+        eul = ptu.to_numpy(quaternion_to_euler(ptu.tensor(quat).unsqueeze(0)))
+
         # remove the old cylinder if it exists
         if self.sphere is not None:
             self.sphere.remove()
@@ -116,18 +125,44 @@ class Animator:
         if self.sphere is None:
             self.sphere = self.draw_sphere(x_center=0, y_center=0, z_center=0, radius=self.sphere_rad)
 
+        # the line drawing the trajectory itself
         self.line1.set_data(x_from0, y_from0)
         self.line1.set_3d_properties(z_from0)
+
+        # remove the old quivers if they exist
+        self.quiver_x.remove()
+        self.quiver_y.remove()
+        self.quiver_z.remove()
+
+        # Draw new quivers at the updated location
+        roll, pitch, yaw = ptu.from_numpy(eul[0])
+        R = ptu.to_numpy(euler_to_rot_matrix(roll.unsqueeze(0), pitch.unsqueeze(0), yaw.unsqueeze(0)).squeeze(0))
+        length = self.length  # adjust as necessary
+        x_axis = R @ np.array([length, 0, 0])
+        y_axis = R @ np.array([0, length, 0])
+        z_axis = R @ np.array([0, 0, length])
+
+        self.quiver_x = self.ax.quiver(x, y, z, x_axis[0], x_axis[1], x_axis[2], color='r', length=length, normalize=True)
+        self.quiver_y = self.ax.quiver(x, y, z, y_axis[0], y_axis[1], y_axis[2], color='g', length=length, normalize=True)
+        self.quiver_z = self.ax.quiver(x, y, z, z_axis[0], z_axis[1], z_axis[2], color='b', length=length, normalize=True)
+        
+        # the line drawing the 
         self.titleTime.set_text(u"Time = {:.2f} s".format(time))
 
-        return self.line1
+        return self.line1, self.quiver_x, self.quiver_y, self.quiver_z
     
     def ini_plot(self):
 
+        # trajectory line instantiation
         self.line1.set_data(np.empty([1]), np.empty([1]))
         self.line1.set_3d_properties(np.empty([1]))
 
-        return self.line1
+        # Instantiate quivers for 3 orientation lines
+        self.quiver_x = self.ax.quiver(0, 0, 0, 0, 0, 0, color='r', length=1, normalize=True)
+        self.quiver_y = self.ax.quiver(0, 0, 0, 0, 0, 0, color='g', length=1, normalize=True)
+        self.quiver_z = self.ax.quiver(0, 0, 0, 0, 0, 0, color='b', length=1, normalize=True)
+
+        return self.line1, self.quiver_x, self.quiver_y, self.quiver_z
     
     def animate(self):
         line_ani = animation.FuncAnimation(
@@ -163,7 +198,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     # Parameters
-    num_points = 1000  # Number of points (100 seconds / 0.1s intervals)
+    num_points = 100  # Number of points (100 seconds / 0.1s intervals)
     radius_state = 5  # Arbitrary radius for the state circle
     radius_ref = 7  # Arbitrary radius for the reference circle
     angle_increment = 2 * np.pi / num_points  # Incremental angle for full circle
