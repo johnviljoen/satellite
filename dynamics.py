@@ -4,7 +4,7 @@ from utils.rotation import quaternion_derivative
 
 def state_dot(state: torch.Tensor, action: torch.Tensor, G=6.67430e-11, M=5.972e+24):
     """
-    Compute the time derivative of the state.
+    Compute the time derivative of the state. This is the J1 dynamics alone.
 
     Parameters:
     - state: Tensor containing the state.               [minibatch, nx]
@@ -20,7 +20,7 @@ def state_dot(state: torch.Tensor, action: torch.Tensor, G=6.67430e-11, M=5.972e
     - Tensor containing the time derivative of the state.
     """
 
-        # Extract positions and velocities
+    # Extract positions and velocities
     pos = state[:, :3]  # [minibatch, 3]
     vel = state[:, 7:10]  # [minibatch, 3]
 
@@ -36,7 +36,7 @@ def state_dot(state: torch.Tensor, action: torch.Tensor, G=6.67430e-11, M=5.972e
     q = state[:, 3:7]  # Extract quaternions from the state
     omega = state[:, 10:13]  # Extract angular velocities (p, q, r)
 
-    q_dot = quaternion_derivative(q, omega)
+    q_dot = quaternion_derivative.pytorch_batched(q, omega)
 
     # Compute the time derivative of the state
     state_dot = torch.hstack([

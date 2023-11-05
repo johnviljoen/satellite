@@ -11,7 +11,8 @@ setup(name='satellite',
     author='John Viljoen',
     author_email='johnviljoen2@gmail.com',
     install_requires=[
-        'neuromancer'
+        'neuromancer',
+        'casadi'
     ],
     packages=find_packages(
         include=[

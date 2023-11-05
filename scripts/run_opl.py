@@ -6,6 +6,9 @@ from utils.orbital_elements import state_to_orbital_elements
 import numpy as np
 from utils.animator import Animator
 
+# setup
+# -----
+
 ptu.init_gpu(use_gpu=True, gpu_id=0)
 ptu.init_dtype(set_dtype=torch.float32)
 
@@ -16,13 +19,19 @@ state[:,8] += 1000
 state[:,9] += 100
 action = ptu.tensor([[0.,0,0,0,0,0]])
 
+# simulate
+# --------
+
 state_history = [ptu.to_numpy(state)]
 times = torch.arange(Ti, Tf, Ts)
 for t in times:
     state += state_dot(state, action) * Ts
-    print(state_to_orbital_elements(state))
+    print(state_to_orbital_elements.pytorch_batched(state))
     state_history.append(ptu.to_numpy(state))
     print(t)
+
+# animate 
+# -------
 
 state_history = np.vstack(state_history)
 reference_history = np.copy(state_history)

@@ -114,7 +114,7 @@ class Animator:
             self.q3
         ])[:,i]
 
-        eul = ptu.to_numpy(quaternion_to_euler(ptu.tensor(quat).unsqueeze(0)))
+        eul = quaternion_to_euler.numpy(quat)
 
         # remove the old cylinder if it exists
         if self.sphere is not None:
@@ -135,8 +135,8 @@ class Animator:
         self.quiver_z.remove()
 
         # Draw new quivers at the updated location
-        roll, pitch, yaw = ptu.from_numpy(eul[0])
-        R = ptu.to_numpy(euler_to_rot_matrix(roll.unsqueeze(0), pitch.unsqueeze(0), yaw.unsqueeze(0)).squeeze(0))
+        roll, pitch, yaw = eul
+        R = euler_to_rot_matrix.numpy(roll, pitch, yaw)
         length = self.length  # adjust as necessary
         x_axis = R @ np.array([length, 0, 0])
         y_axis = R @ np.array([0, length, 0])
