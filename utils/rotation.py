@@ -286,15 +286,29 @@ class quaternion_derivative:
         return q_dot
     
     @staticmethod
-    def pytorch(roll, pitch, yaw):
+    def pytorch(q, omega):
         raise NotImplementedError
     
     @staticmethod
-    def casadi(roll, pitch, yaw):
-        raise NotImplementedError    
+    def casadi(q, omega):
+        # Assuming q is a column vector [4, 1] with q = [q0, q1, q2, q3]
+        # omega is a column vector [3, 1] with omega = [p, q, r]
+        
+        # Quaternion multiplication matrix
+        Q_mat = ca.vertcat(
+            ca.horzcat(-q[1], -q[2], -q[3]),
+            ca.horzcat( q[0], -q[3],  q[2]),
+            ca.horzcat( q[3],  q[0], -q[1]),
+            ca.horzcat(-q[2],  q[1],  q[0])
+        )
+
+        # Multiply by the angular velocity to get the quaternion derivative
+        q_dot = 0.5 * ca.mtimes(Q_mat, omega)
+
+        return q_dot 
     
     @staticmethod
-    def numpy_batched(roll, pitch, yaw):
+    def numpy_batched(q, omega):
         raise NotImplementedError  
 
 if __name__ == "__main__":

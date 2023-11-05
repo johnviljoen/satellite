@@ -1,8 +1,10 @@
 import torch
+import casadi as ca
+import numpy as np
 import utils.pytorch as ptu
 
 class state_to_orbital_elements:
-    
+
     @staticmethod
     def pytorch_batched(state: torch.Tensor, mu=398600.4418):
         
@@ -69,7 +71,56 @@ class state_to_orbital_elements:
             'argument_of_periapsis': omega,
             'true_anomaly': nu
         }
+    
+    @staticmethod
+    def casadi(state: ca.MX, mu=398600.4418):
+        # state is assumed to be a single vector
+        r_vec = state[:3]
+        v_vec = state[7:10]
 
+        # Calculate specific angular momentum
+        h_vec = ca.cross(r_vec, v_vec)
+        h = ca.norm_2(h_vec)
+
+        # Avoid division by zero for angular momentum
+        h = ca.if_else(h == 0, 1e-10, h)
+
+        # Calculate the eccentricity vector
+        r = ca.norm_2(r_vec)
+        v = ca.norm_2(v_vec)
+        term1 = ca.cross(v_vec, h_vec) / mu
+        term2 = r_vec / r
+        e_vec = term1 - term2
+        e = ca.norm_2(e_vec)
+
+        # Calculate the semi-major axis
+        a = 1 / (2 / r - v**2 / mu)
+
+        # Calculate inclination
+        i = ca.acos(h_vec[2] / h)
+
+        # Calculate the node line
+        k_vec = ca.SX.zeros(3)
+        k_vec[2] = 1
+        n_vec = ca.cross(k_vec, h_vec)
+        n = ca.norm_2(n_vec)
+
+        # Right ascension of the ascending node (RAAN)
+        Omega = ca.if_else(n != 0, ca.acos(n_vec[0] / n), 0)
+        Omega = ca.if_else(n_vec[1] < 0, 2 * np.pi - Omega, Omega)
+
+        # Argument of periapsis
+        omega = ca.if_else((n != 0) & (e != 0), ca.acos(ca.dot(n_vec, e_vec) / (n * e)), 0)
+        omega = ca.if_else(e_vec[2] < 0, 2 * np.pi - omega, omega)
+
+        # True anomaly
+        nu = ca.if_else(e != 0, ca.acos(ca.dot(r_vec, e_vec) / (e * r)), 0)
+        radial_velocity = ca.dot(r_vec, v_vec)
+        nu = ca.if_else(radial_velocity < 0, 2 * np.pi - nu, nu)
+
+        return ca.vertcat(a, e, i, Omega, omega, nu)
+    
+    
 if __name__ == "__main__":
 
     import utils.pytorch as ptu

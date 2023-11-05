@@ -25,7 +25,7 @@ action = ptu.tensor([[0.,0,0,0,0,0]])
 state_history = [ptu.to_numpy(state)]
 times = torch.arange(Ti, Tf, Ts)
 for t in times:
-    state += state_dot(state, action) * Ts
+    state += state_dot.pytorch_batched(state, action) * Ts
     print(state_to_orbital_elements.pytorch_batched(state))
     state_history.append(ptu.to_numpy(state))
     print(t)
