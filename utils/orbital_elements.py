@@ -100,7 +100,7 @@ class state_to_orbital_elements:
         i = ca.acos(h_vec[2] / h)
 
         # Calculate the node line
-        k_vec = ca.SX.zeros(3)
+        k_vec = ca.MX.zeros(3)
         k_vec[2] = 1
         n_vec = ca.cross(k_vec, h_vec)
         n = ca.norm_2(n_vec)
@@ -110,8 +110,9 @@ class state_to_orbital_elements:
         Omega = ca.if_else(n_vec[1] < 0, 2 * np.pi - Omega, Omega)
 
         # Argument of periapsis
-        omega = ca.if_else((n != 0) & (e != 0), ca.acos(ca.dot(n_vec, e_vec) / (n * e)), 0)
-        omega = ca.if_else(e_vec[2] < 0, 2 * np.pi - omega, omega)
+        omega_cond = ca.logic_and(n > 0, e > 0)
+        omega = ca.if_else(omega_cond, ca.acos(ca.dot(n_vec, e_vec) / (n * e)), 0)
+        omega = ca.if_else(e_vec[2] < 0, 2 * ca.pi - omega, omega)
 
         # True anomaly
         nu = ca.if_else(e != 0, ca.acos(ca.dot(r_vec, e_vec) / (e * r)), 0)
@@ -120,7 +121,7 @@ class state_to_orbital_elements:
 
         return ca.vertcat(a, e, i, Omega, omega, nu)
     
-    
+
 if __name__ == "__main__":
 
     import utils.pytorch as ptu

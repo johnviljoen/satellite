@@ -12,20 +12,21 @@ class state_dot:
     Parameters:
     - state: Tensor containing the state.               [minibatch, nx]
             {x, y, z, q0, q1, q2, q3, xdot, ydot, zdot, p, q, r}
-            0  1  2  3   4   5   6   7     8     9     10 11 12
+             0  1  2  3   4   5   6   7     8     9     10 11 12
     - action: Tensor containing the control inputs.     [minibatch, nu]
             {x2dot, y2dot, z2dot, pdot, qdot, rdot}
-            0      1      2      3     4     5
+             0      1      2      3     4     5
     - G: Gravitational constant.
     - M: Mass of the Earth.
     
     Returns:
-    - Tensor containing the time derivative of the state.
+    - Tensor containing the time derivative of the state concatenated with the orbital elements
+            {[state_dot]}
+              0 : 13
     """
 
     @staticmethod
     def pytorch_batched(state: torch.Tensor, action: torch.Tensor, G=6.67430e-11, M=5.972e+24):
-
 
         # Extract positions and velocities
         pos = state[:, :3]  # [minibatch, 3]
