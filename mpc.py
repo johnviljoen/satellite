@@ -14,6 +14,9 @@ class MPC:
             dts_init,                   # initial variable timestep
             state_dot,                  # CasADI dynamics
             init_state,                 # where to do first solve to start warm start variables
+            state_ub,                   # state box constraint upper bound
+            state_lb,                   # state box constraint lower bound
+            init_ref,                   # initial desired orbital elements / orientation
 
             integrator_type = "euler",  # "euler", "RK4"
         ):
@@ -23,8 +26,9 @@ class MPC:
         self.Tf_hzn = Tf_hzn
         self.dts_init = dts_init
         self.dynamics = state_dot
-        self.state_ub = None
-        self.state_lb = None
+        self.state_ub = state_ub
+        self.state_lb = state_lb
+
         self.integrator_type = integrator_type
 
         # 13 free space states, 6 orbital elements, 6 acceleration inputs
@@ -32,7 +36,7 @@ class MPC:
 
         # create optimizer and define its optimization variables
         self.opti = ca.Opti()
-        self.X = self.opti.variable(self.nx + self.noe, N+1)
+        self.X = self.opti.variable(self.nx, N+1) # these are the free space states themselves
         self.U = self.opti.variable(self.m, N+1) # final input plays no role
 
         # adaptive timestep means that it must be seen as a parameter to the opti
@@ -57,17 +61,17 @@ class MPC:
         self.opti.solver('ipopt', opts)
 
         # define start condition (dummy)
-        self.init = self.opti.parameter(self.n,1)
-        self.opti.set_value(self.init, init_state)
-        self.opti.subject_to(self.X[:,0] == self.init)
+        self.init_X = self.opti.parameter(self.nx, 1)
+        self.opti.set_value(self.init_X, init_state)
+        self.opti.subject_to(self.X[:,0] == self.init_X)
 
-        # define dummy reference (n x N)
-        reference = np.zeros([self.n,N+1])
-        self.ref = self.opti.parameter(self.n,N+1)
+        # define dummy reference (noe + 4 x N) (includes 4 quaternion states for desired orientation)
+        reference = np.zeros([self.noe + 4 + 3, N+1])
+        self.ref = self.opti.parameter(self.noe + 4 + 3,N+1) 
         self.opti.set_value(self.ref, reference)
 
         # cost function
-        self.opti.minimize(self.cost(self.X, self.ref, self.U)) # discounted
+        self.opti.minimize(self.cost(self.X, self.ref, self.U))
 
         # solve the mpc once, so that we can do it repeatedly in a method later
         sol = self.opti.solve()
@@ -80,7 +84,7 @@ class MPC:
         # point to point control, from state to stationary reference
 
         # define start condition
-        self.opti.set_value(self.init, state)
+        self.opti.set_value(self.init_X, state)
 
         # calculate the adaptive dts
         dts = self.adaptive_dts_Tf_hzn(state, reference)
@@ -114,16 +118,25 @@ class MPC:
         # reference is {a, e, i, Omega, omega, nu, [quat_des]}
         #               |--- orbital elements ---|-- quat ---|
 
-        q_err = quaternion_error.casadi(state[3:7,:], reference[6:,:])
+        # state_error = reference - state
 
-        state_error = reference - state
+        # oe_err = reference - state_to_orbital_elements.casadi(state)
+        # q_error = quaternion_error.casadi(state[3:7,:], reference[6:,:])
+
         cost = ca.MX(0)
         # lets get cost per timestep:
         for k in range(self.N + 1):
             timestep_input = input[:,k]
             timestep_orbital_elements = state_to_orbital_elements.casadi(state[:,k])
-            timestep_oe_error = reference - timestep_orbital_elements
-            cost += (timestep_oe_error.T @ self.Q @ timestep_oe_error + timestep_input.T @ self.R @ timestep_input)
+            timestep_angular_rates = state[10:13,k]
+
+            timestep_orbital_elements_error = reference[:6,k] - timestep_orbital_elements 
+            timestep_q_error = quaternion_error.casadi(state[3:7,k], reference[6:,k])
+            timestep_angular_rates_error = 0 - timestep_angular_rates # desired is zero... or is it
+
+            timestep_observation_error = ca.vertcat(timestep_orbital_elements_error, timestep_q_error, timestep_angular_rates_error)
+            cost += (timestep_observation_error.T @ self.Q @ timestep_observation_error + timestep_input.T @ self.R @ timestep_input)
+
         return cost
 
     # Constraints and Weights Methods 
@@ -132,26 +145,24 @@ class MPC:
     def create_weight_matrices(self):
 
         # define weighting matrices
-        Q = ca.MX.zeros(self.nx + self.noe, self.nx + self.noe)
-        Q[0,0] =   0 # x
-        Q[1,1] =   0 # y
-        Q[2,2] =   0 # z
-        Q[3,3] =   1 # q0
-        Q[4,4] =   1 # q1
-        Q[5,5] =   1 # q2
-        Q[6,6] =   1 # q3
-        Q[7,7] =   0 # xdot
-        Q[8,8] =   0 # ydot
-        Q[9,9] =   0 # zdot
+        Q = ca.MX.zeros(self.noe + 7, self.noe + 7)
+
+        # position
+        Q[0,0] = 1 # a
+        Q[1,1] = 1 # e
+        Q[2,2] = 1 # i
+        Q[3,3] = 1 # Omega
+        Q[4,4] = 1 # omega
+        Q[5,5] = 1 # nu
+
+        # orientation
+        Q[6,6] =   1 # q0
+        Q[7,7] =   1 # q1
+        Q[8,8] =   1 # q2
+        Q[9,9] =   1 # q3
         Q[10,10] = 1 # p
         Q[11,11] = 1 # q
         Q[12,12] = 1 # r
-        Q[13,13] = 1 # a
-        Q[14,14] = 1 # e
-        Q[15,15] = 1 # i
-        Q[16,16] = 1 # Omega
-        Q[17,17] = 1 # omega
-        Q[18,18] = 1 # nu
 
         R = ca.MX.eye(self.m)
 
@@ -162,24 +173,18 @@ class MPC:
         if self.integrator_type == 'euler':
             for k in range(self.N):
                 input = self.U[:,k]
-                sdot_k = self.dynamics(self.X[:self.nx,k], input)
-                x_next = self.X[:self.nx,k] + sdot_k * dts[k]
-                opti.subject_to(self.X[:self.nx,k+1] == x_next)
-                self.apply_orbital_elements_constraints(opti, x_next, k)
+                sdot_k = self.dynamics(self.X[:,k], input)
+                x_next = self.X[:,k] + sdot_k * dts[k]
+                opti.subject_to(self.X[:,k+1] == x_next)
 
         elif self.integrator_type == 'RK4':
             for k in range(self.N):
-                k1 = self.dynamics(self.X[:self.nx,k], self.U[:,k])
-                k2 = self.dynamics(self.X[:self.nx,k] + dts[k] / 2 * k1, self.U[:,k])
-                k3 = self.dynamics(self.X[:self.nx,k] + dts[k] / 2 * k2, self.U[:,k])
-                k4 = self.dynamics(self.X[:self.nx,k] + dts[k] * k3, self.U[:,k])
-                x_next = self.X[:self.nx,k] + dts[k] / 6 * (k1 + 2*k2 + 2*k3 + k4)
-                opti.subject_to(self.X[:self.nx,k+1] == x_next)
-                self.apply_orbital_elements_constraints(opti, x_next, k)
-
-    def apply_orbital_elements_constraints(self, opti, x_next, k):
-        next_orbital_elements = state_to_orbital_elements.casadi(x_next)
-        opti.subject_to(self.X[self.nx:,k+1] == next_orbital_elements)
+                k1 = self.dynamics(self.X[:,k], self.U[:,k])
+                k2 = self.dynamics(self.X[:,k] + dts[k] / 2 * k1, self.U[:,k])
+                k3 = self.dynamics(self.X[:,k] + dts[k] / 2 * k2, self.U[:,k])
+                k4 = self.dynamics(self.X[:,k] + dts[k] * k3, self.U[:,k])
+                x_next = self.X[:,k] + dts[k] / 6 * (k1 + 2*k2 + 2*k3 + k4)
+                opti.subject_to(self.X[:,k+1] == x_next)
 
     def apply_state_input_constraints(self, opti):
         # apply state constraints
@@ -214,7 +219,7 @@ class MPC:
         # print(f"lookahead time: {sum(dts)}")
 
         return dts
-    
+
 if __name__ == "__main__":
 
     from params import get_params
@@ -226,6 +231,8 @@ if __name__ == "__main__":
     Tf = 10000
     Tf_hzn = 1000
     N = 10
+    state_ub = np.ones(13) * np.inf
+    state_lb = np.ones(13) * np.inf
 
     # Find the optimal dts for the MPC
     dt_1 = Ts
@@ -238,7 +245,9 @@ if __name__ == "__main__":
         Tf_hzn=Tf_hzn,
         dts_init=dts_init,
         state_dot=state_dot.casadi,
-        init_state=params["init_state"],
+        init_state=ptu.to_numpy(params["init_state"]),
+        state_ub=state_ub,
+        state_lb=state_lb,
         integrator_type='euler'
     )
 

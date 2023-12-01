@@ -264,7 +264,7 @@ class euler_to_rot_matrix:
         R = R_z @ R_y @ R_x
 
         return R
-    
+
 class quaternion_derivative:
     # Functions to calculate the quaternion derivative given quaternion and angular velocity
 
@@ -315,15 +315,15 @@ class quaternion_conjugate:
 
     @staticmethod
     def casadi(q):
-        return ca.vertcat(q[0], -q[1], -q[2], -q[3])
+        return ca.vertcat(q[0,:], -q[1,:], -q[2,:], -q[3,:])
 
 class quaternion_multiply:
 
     @staticmethod
     def casadi(q1, q2):
         # Quaternion multiplication (Hamilton product)
-        w1, x1, y1, z1 = q1[0], q1[1], q1[2], q1[3]
-        w2, x2, y2, z2 = q2[0], q2[1], q2[2], q2[3]
+        w1, x1, y1, z1 = q1[0,:], q1[1,:], q1[2,:], q1[3,:]
+        w2, x2, y2, z2 = q2[0,:], q2[1,:], q2[2,:], q2[3,:]
         return ca.vertcat(
             w1*w2 - x1*x2 - y1*y2 - z1*z2,
             w1*x2 + x1*w2 + y1*z2 - z1*y2,
@@ -336,8 +336,8 @@ class quaternion_error:
     @staticmethod
     def casadi(q, q_desired):
         # Calculate the quaternion error
-        q_desired_conjugate = quaternion_conjugate(q_desired)
-        return quaternion_multiply(q, q_desired_conjugate)
+        q_desired_conjugate = quaternion_conjugate.casadi(q_desired)
+        return quaternion_multiply.casadi(q, q_desired_conjugate)
 
 if __name__ == "__main__":
     

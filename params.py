@@ -1,5 +1,6 @@
 import torch
 import utils.pytorch as ptu
+from utils.orbital_elements import state_to_orbital_elements
 
 def get_params():
 
@@ -7,8 +8,12 @@ def get_params():
         7000e3, 0, 0,    # position
         1, 0, 0, 0,      # quaternion
         0, 7.5e3, 0,     # velocity
-        0, 0, 0         # angular rates
+        0, 0, 0          # angular rates
     ]])
+
+    init_ref = state_to_orbital_elements.pytorch_batched(init_state)
+
+    
 
     return locals()
 

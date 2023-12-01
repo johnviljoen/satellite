@@ -1,6 +1,0 @@
-setup.py
-satellite.egg-info/PKG-INFO
-satellite.egg-info/SOURCES.txt
-satellite.egg-info/dependency_links.txt
-satellite.egg-info/requires.txt
-satellite.egg-info/top_level.txt
